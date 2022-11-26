@@ -10,11 +10,9 @@ class UserController {
   }
 
   onEdit() {
-    document
-      .querySelector("#box-user-update .btn-cancel")
-      .addEventListener("click", (e) => {
-        this.showPanelCreate();
-      });
+    document.querySelector("#box-user-update .btn-cancel").addEventListener("click", (e) => {
+      this.showPanelCreate();
+    });
 
     this.formUpdateEl.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -41,31 +39,21 @@ class UserController {
             result._photo = content;
           }
 
-          tr.dataset.user = JSON.stringify(result);
+          let user = new User();
 
-          tr.innerHTML = `
-                        <td><img src="${
-                          result._photo
-                        }" class="img-circle img-sm"></td>
-                        <td>${result._name}</td>
-                        <td>${result._email}</td>
-                        <td>${result._admin ? "Sim" : "Não"}</td>
-                        <td>${Utils.dateFormat(result._register)}</td>
-                        <td>
-                            <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
-                            <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
-                        </td>
-                    `;
+          user.loadFromJSON(result);
 
-          this.addEventsTr(tr);
+          user.save();
+
+          this.getTr(user, tr);
 
           this.updateCount();
 
           this.formUpdateEl.reset();
 
-          this.showPanelCreate();
-
           btn.disabled = false;
+
+          this.showPanelCreate();
         },
         (e) => {
           console.error(e);
@@ -90,7 +78,7 @@ class UserController {
         (content) => {
           values.photo = content;
 
-          this.insert(values);
+          values.save();
 
           this.addLine(values);
 
@@ -138,15 +126,12 @@ class UserController {
     let isValid = true;
 
     [...formEl.elements].forEach(function (field, index) {
-      if (
-        ["name", "email", "password"].indexOf(field.name) > -1 &&
-        !field.value
-      ) {
+      if (["name", "email", "password"].indexOf(field.name) > -1 && !field.value) {
         field.parentElement.classList.add("has-error");
         isValid = false;
       }
 
-      if (field.name === "gender") {
+      if (field.name == "gender") {
         if (field.checked) {
           user[field.name] = field.value;
         }
@@ -161,30 +146,11 @@ class UserController {
       return false;
     }
 
-    return new User(
-      user.name,
-      user.gender,
-      user.birth,
-      user.country,
-      user.email,
-      user.password,
-      user.photo,
-      user.admin
-    );
-  }
-
-  getusersStorage() {
-    let users = [];
-
-    if (sessionStorage.getItem("users")) {
-      users = JSON.parse(sessionStorage.getItem("users"));
-    }
-
-    return users;
+    return new User(user.name, user.gender, user.birth, user.country, user.email, user.password, user.photo, user.admin);
   }
 
   selectAll() {
-    let users = this.getusersStorage();
+    let users = User.getUsersStorage();
 
     users.forEach((dataUser) => {
       let user = new User();
@@ -195,43 +161,45 @@ class UserController {
     });
   }
 
-  insert(data) {
-    let users = this.getusersStorage();
-
-    users.push(data);
-
-    sessionStorage.setItem("users", JSON.stringify(users));
-  }
-
   addLine(dataUser) {
-    let tr = document.createElement("tr");
-
-    tr.dataset.user = JSON.stringify(dataUser);
-
-    tr.innerHTML = `
-            <tr>
-                <td><img src=${dataUser.photo} class="img-circle img-sm"></td>
-                <td>${dataUser.name}</td>
-                <td>${dataUser.email}</td>
-                <td>${dataUser.admin ? "Sim" : "Não"}</td>
-                <td>${Utils.dateFormat(dataUser.register)}</td>
-                <td>
-                    <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
-                    <button type="button" class="btn btn-danger btn-delete btn-xs btn-flat">Excluir</button>
-                </td>
-            </tr>
-        `;
-
-    this.addEventsTr(tr);
+    let tr = this.getTr(dataUser);
 
     this.tableEl.appendChild(tr);
 
     this.updateCount();
   }
 
+  getTr(dataUser, tr = null) {
+    if (tr === null) tr = document.createElement("tr");
+
+    tr.dataset.user = JSON.stringify(dataUser);
+
+    tr.innerHTML = `
+            <td><img src="${dataUser.photo}" alt="User Image" class="img-circle img-sm"></td>
+            <td>${dataUser.name}</td>
+            <td>${dataUser.email}</td>
+            <td>${dataUser.admin ? "Sim" : "Não"}</td>
+            <td>${Utils.dateFormat(dataUser.register)}</td>
+            <td>
+                <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
+                <button type="button" class="btn btn-danger btn-delete btn-xs btn-flat">Excluir</button>
+            </td>
+        `;
+
+    this.addEventsTr(tr);
+
+    return tr;
+  }
+
   addEventsTr(tr) {
     tr.querySelector(".btn-delete").addEventListener("click", (e) => {
-      if (confirm("Deseja relamente excluir?")) {
+      if (confirm("Deseja realmente excluir?")) {
+        let user = new User();
+
+        user.loadFromJSON(JSON.parse(tr.dataset.user));
+
+        user.remove();
+
         tr.remove();
 
         this.updateCount();
@@ -244,9 +212,7 @@ class UserController {
       this.formUpdateEl.dataset.trIndex = tr.sectionRowIndex;
 
       for (let name in json) {
-        let field = this.formUpdateEl.querySelector(
-          "[name=" + name.replace("_", "") + "]"
-        );
+        let field = this.formUpdateEl.querySelector("[name=" + name.replace("_", "") + "]");
 
         if (field) {
           switch (field.type) {
@@ -255,9 +221,7 @@ class UserController {
               break;
 
             case "radio":
-              field = this.formUpdateEl.querySelector(
-                "[name=" + name.replace("_", "") + "][value=" + json[name] + "]"
-              );
+              field = this.formUpdateEl.querySelector("[name=" + name.replace("_", "") + "][value=" + json[name] + "]");
               field.checked = true;
               break;
 
@@ -268,8 +232,6 @@ class UserController {
             default:
               field.value = json[name];
           }
-
-          field.value = json[name];
         }
       }
 
